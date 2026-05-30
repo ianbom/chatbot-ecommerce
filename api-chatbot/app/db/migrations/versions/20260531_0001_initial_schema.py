@@ -7,7 +7,7 @@ Create Date: 2026-05-31
 
 from alembic import op
 
-from app.db.base import Base
+from app.model import Base
 
 revision = "20260531_0001"
 down_revision = None
@@ -24,3 +24,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     Base.metadata.drop_all(bind=bind)
+
+
+

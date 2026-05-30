@@ -54,3 +54,4 @@ def _b64_json(value: dict) -> str:
 
 def _b64_bytes(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+

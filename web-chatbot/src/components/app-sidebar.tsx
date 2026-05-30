@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ChartBarIcon, PackageIcon, ShoppingCartIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { LayoutDashboardIcon, ChartBarIcon, PackageIcon, ShoppingCartIcon, UsersIcon, TargetIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -56,9 +56,17 @@ const data = {
     },
     {
       title: "Customers",
-      url: "#",
+      url: "/customers",
       icon: (
         <UsersIcon
+        />
+      ),
+    },
+    {
+      title: "Leads",
+      url: "/leads",
+      icon: (
+        <TargetIcon
         />
       ),
     },

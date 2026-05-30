@@ -5,7 +5,7 @@ from sqlalchemy import delete
 
 from app.db.session import SessionLocal
 from app.main import app
-from app.modules.users.models import User
+from app.model.user import User
 
 client = TestClient(app)
 
@@ -102,3 +102,5 @@ def test_register_rejects_duplicate_email() -> None:
     assert second_response.json()["detail"] == "Email already registered"
 
     cleanup_user(email)
+
+
