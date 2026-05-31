@@ -46,6 +46,12 @@ class ChatMessage(Base):
         Index("ix_chat_messages_sender_type", "sender_type"),
         Index("ix_chat_messages_intent", "intent"),
         Index("ix_chat_messages_related_product_id", "related_product_id"),
+        Index(
+            "ux_chat_messages_external_message_id",
+            "external_message_id",
+            unique=True,
+            postgresql_where="external_message_id IS NOT NULL",
+        ),
         Index("ix_chat_messages_created_at", "created_at"),
     )
 
@@ -55,6 +61,7 @@ class ChatMessage(Base):
         pg_enum(ChatSenderType, "chat_sender_type"), nullable=False
     )
     sender_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    external_message_id: Mapped[str | None] = mapped_column(String(191))
     message: Mapped[str] = mapped_column(Text, nullable=False)
     intent: Mapped[ChatIntent] = mapped_column(
         pg_enum(ChatIntent, "chat_intent"), server_default=ChatIntent.unknown.value, nullable=False

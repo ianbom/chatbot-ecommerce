@@ -1,0 +1,302 @@
+1. Konsep utamanya
+
+Bot tidak langsung “tahu semua”. Bot bekerja seperti ini:
+
+Customer kirim pesan WhatsApp
+↓
+WAHA kirim webhook ke FastAPI
+↓
+FastAPI kirim pesan ke Ollama
+↓
+Ollama membaca maksud customer
+↓
+FastAPI query database
+↓
+FastAPI kirim data hasil query ke Ollama
+↓
+Ollama membuat jawaban natural
+↓
+FastAPI kirim jawaban ke WhatsApp lewat WAHA
+
+WAHA dipakai untuk menerima dan mengirim pesan WhatsApp lewat HTTP API, termasuk endpoint seperti POST /api/sendText.
+Ollama dipakai untuk structured output agar hasil LLM bisa dipaksa menjadi JSON sesuai schema.
+
+2. Peran masing-masing komponen
+WAHA
+= jembatan WhatsApp
+
+FastAPI
+= otak bisnis / pengambil keputusan
+
+Ollama LLM
+= penerjemah bahasa customer
+
+Database
+= sumber data produk, stok, harga, order
+
+Midtrans
+= pembayaran
+
+Biteship
+= ongkir dan pengiriman
+
+Jangan biarkan LLM langsung menentukan harga, stok, atau status pembayaran. Semua data penting harus dari database atau API resmi.
+
+3. Buat daftar intent
+
+Intent adalah maksud customer.
+
+Contoh:
+
+Customer: Barang B ada?
+Intent: ask_product
+
+Customer: Harganya berapa?
+Intent: ask_price
+
+Customer: Saya mau beli 2
+Intent: add_to_cart
+
+Customer: Checkout
+Intent: checkout
+
+Customer: Ongkir ke Bandung berapa?
+Intent: ask_shipping_cost
+
+Minimal intent:
+
+INTENTS = [
+    "greeting",
+    "ask_product",
+    "ask_price",
+    "ask_stock",
+    "ask_variant",
+    "ask_how_to_order",
+    "add_to_cart",
+    "view_cart",
+    "checkout",
+    "confirm_address",
+    "ask_shipping_cost",
+    "create_payment",
+    "payment_status",
+    "order_status",
+    "complaint",
+    "human_help",
+    "unknown"
+]
+4. Buat output JSON dari LLM
+
+Jangan minta Ollama jawab bebas. Minta Ollama ubah pesan customer menjadi JSON.
+
+Contoh customer:
+
+Kak Barang B ready? Harganya berapa?
+
+Output LLM yang kamu inginkan:
+
+{
+  "intent": "ask_product",
+  "product_name": "Barang B",
+  "quantity": null,
+  "address": null,
+  "confidence": 0.92
+}
+
+Contoh lain:
+
+Saya mau beli 2 yang warna hitam
+
+Output:
+
+{
+  "intent": "add_to_cart",
+  "product_name": null,
+  "quantity": 2,
+  "variant": "hitam",
+  "confidence": 0.88
+}
+
+Di sini product_name boleh null karena bot bisa mengambil produk dari state percakapan sebelumnya.
+
+5. State percakapan
+
+Agar bot terasa manusiawi, bot harus ingat konteks.
+
+Contoh:
+
+Customer: Barang B ada?
+Bot: Ada kak, mau pesan berapa?
+
+Customer: 2
+
+Pesan "2" tidak bisa dipahami kalau tidak ada konteks. Maka kamu perlu simpan state:
+
+{
+  "phone": "628123456789",
+  "stage": "waiting_quantity",
+  "current_product_name": "Barang B",
+  "cart": [],
+  "last_intent": "ask_product"
+}
+
+Jadi saat customer jawab "2", bot paham:
+
+2 = jumlah Barang B
+
+7. Alur bot memahami pesan customer
+
+Misal customer chat:
+
+Kak ada Barang B?
+
+Alurnya:
+
+1. FastAPI menerima pesan dari WAHA
+2. FastAPI ambil state customer dari database
+3. FastAPI kirim message + state ke Ollama
+4. Ollama balas JSON intent
+5. FastAPI membaca intent ask_product
+6. FastAPI cari Barang B di database
+7. FastAPI mendapatkan harga, stok, deskripsi
+8. FastAPI kirim data produk ke Ollama
+9. Ollama susun jawaban natural
+10. FastAPI kirim balasan ke WhatsApp
+
+19. Cara bot tahu data yang customer inginkan
+
+Bot tahu dari kombinasi:
+
+1. Pesan customer
+2. Intent dari LLM
+3. Entity extraction
+4. State percakapan
+5. Query database
+
+Contoh:
+
+Customer: Barang B ada?
+
+LLM mengambil entity:
+
+{
+  "intent": "ask_product",
+  "product_name": "Barang B"
+}
+
+FastAPI query:
+
+SELECT * FROM products
+WHERE name ILIKE '%Barang B%'
+LIMIT 1;
+
+Lalu database mengembalikan:
+
+{
+  "name": "Barang B",
+  "price": 120000,
+  "stock": 8,
+  "description": "Produk premium untuk kebutuhan harian"
+}
+
+Bot menjawab:
+
+Ada kak 😊
+
+Barang B ready stok 8 pcs.
+Harganya Rp120.000.
+Produk ini cocok untuk kebutuhan harian.
+
+Mau saya bantu pesankan?
+20. Contoh percakapan lengkap
+Customer:
+Kak Barang B ada?
+
+Bot:
+Ada kak 😊 Barang B ready stok 8 pcs.
+Harganya Rp120.000.
+Mau saya bantu pesankan?
+
+Customer:
+Mau 2
+
+Bot:
+Siap kak, saya masukkan 2 Barang B ke keranjang.
+Total sementara Rp240.000.
+Mau lanjut checkout?
+
+Customer:
+Checkout
+
+Bot:
+Siap kak. Boleh kirim nama penerima dan alamat lengkapnya?
+
+Customer:
+Ian, Jl Melati No 10 Bandung
+
+Bot:
+Alamat sudah saya catat kak.
+Saya bantu cek ongkir dulu ya.
+
+Kenapa bot paham "Mau 2"?
+
+Karena state sebelumnya menyimpan:
+
+{
+  "stage": "product_inquiry",
+  "current_product_id": 2
+}
+
+Jadi angka 2 dianggap quantity untuk produk terakhir.
+
+21. Tambahkan RAG untuk pencarian produk yang lebih pintar
+
+Kalau nama produk banyak dan customer menulis tidak persis, pakai search yang lebih pintar.
+
+Contoh customer:
+
+Ada skincare buat kulit kering?
+
+Ini tidak menyebut nama produk. Maka kamu bisa cari berdasarkan deskripsi produk.
+
+Pilihan sederhana:
+
+SELECT * FROM products
+WHERE description ILIKE '%kulit kering%'
+OR name ILIKE '%kulit kering%';
+
+Pilihan lebih bagus:
+
+Gunakan pgvector
+- Simpan embedding nama dan deskripsi produk
+- Ubah pertanyaan customer jadi embedding
+- Cari produk paling mirip
+
+Flow RAG:
+
+Customer tanya kebutuhan
+↓
+Embedding pertanyaan
+↓
+Cari produk mirip di database vector
+↓
+Ambil 3 produk paling relevan
+↓
+Kirim produk itu ke LLM
+↓
+LLM jawab rekomendasi natural
+22. Rule penting agar bot tidak ngawur
+
+Tambahkan aturan wajib:
+
+LLM tidak boleh membuat harga sendiri.
+LLM tidak boleh membuat stok sendiri.
+LLM tidak boleh bilang pembayaran sukses sebelum callback Midtrans.
+LLM tidak boleh bilang barang dikirim sebelum data Biteship ada.
+Kalau data produk tidak ditemukan, tanya ulang.
+Kalau confidence rendah, minta klarifikasi.
+Kalau customer marah/komplain, arahkan ke admin manusia.
+
+Di kode:
+
+if confidence < 0.6:
+    return "Maaf kak, saya kurang paham. Kakak mau tanya produk, pesan barang, atau cek pesanan?"
